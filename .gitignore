@@ -49,6 +49,9 @@ logs/
 .coverage
 htmlcov/
 
+# Database
+*.db
+
 # Node (if any frontend)
 node_modules/
 .npm
