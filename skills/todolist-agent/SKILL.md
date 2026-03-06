@@ -2,16 +2,303 @@
 name: todolist-agent
 description: Your personal todo list for tracking tasks you need to execute. Create, check, and complete your own todos.
 user-invocable: true
-metadata: {"openclaw": {"requires": {"env": ["TODOLIST_API_URL"]}, "emoji": "✅"}}
+metadata: {"openclaw": {"requires": {"env": ["TODOLIST_API_URL", "TODOLIST_API_KEY"]}, "emoji": "✅"}}
 ---
 
 # Agent TodoList
 
 This is YOUR personal todo list. Use it to track tasks you need to execute yourself.
 
+## Authentication
+
+All API calls require authentication via API Key in the Authorization header:
+
+```
+Authorization: Bearer ${TODOLIST_API_KEY}
+```
+
+Your API key is stored in the environment variable `TODOLIST_API_KEY`.
+
 ## Base URL
 
 All API calls use: `${TODOLIST_API_URL}` (default: http://localhost:8000)
+
+## Getting Your API Key
+
+**First-time setup:** An administrator needs to create your API key using:
+
+```
+POST ${TODOLIST_API_URL}/agent/credentials
+Content-Type: application/json
+
+{
+  "agent_id": "your-unique-agent-id",
+  "name": "My Assistant Agent"
+}
+```
+
+Response will include your `api_key`. Store it in `TODOLIST_API_KEY` environment variable.
+
+---
+
+## Available APIs
+
+### 1. Create Todo
+
+**POST** `${TODOLIST_API_URL}/agent/todos`
+
+Create a new todo for yourself.
+
+**Headers:**
+```
+Authorization: Bearer ${TODOLIST_API_KEY}
+Content-Type: application/json
+```
+
+**Request Body:**
+```json
+{
+  "title": "Task title (required)",
+  "description": "Detailed execution instructions (optional)",
+  "due_at": "2026-03-07T09:00:00",
+  "priority": "normal",
+  "repeat_rule": "none"
+}
+```
+
+**Fields:**
+- `title` (required): Brief task description
+- `description` (optional): How to execute this task
+- `due_at` (optional): ISO 8601 datetime when task should be executed
+- `priority` (optional): `low` | `normal` | `high` | `urgent` (default: normal)
+- `repeat_rule` (optional): `none` | `daily` | `weekly` | `monthly` (default: none)
+
+**Response:**
+```json
+{
+  "id": 123,
+  "agent_id": "your-agent-id",
+  "title": "Send weather report",
+  "status": "pending",
+  "due_at": "2026-03-07T09:00:00",
+  "priority": "normal",
+  "repeat_rule": "daily",
+  "created_at": "2026-03-06T13:00:00"
+}
+```
+
+---
+
+### 2. List Todos
+
+**GET** `${TODOLIST_API_URL}/agent/todos?status=pending&due_before=now&priority=high&limit=50`
+
+Query your todo list with filters.
+
+**Headers:**
+```
+Authorization: Bearer ${TODOLIST_API_KEY}
+```
+
+**Query Parameters:**
+- `status` (optional): `pending` | `done` | `failed` | `all` (default: pending)
+- `due_before` (optional): ISO datetime or `now` to filter overdue tasks
+- `priority` (optional): `low` | `normal` | `high` | `urgent`
+- `limit` (optional): Max results, 1-200 (default: 50)
+
+**Response:**
+```json
+[
+  {
+    "id": 123,
+    "agent_id": "your-agent-id",
+    "title": "Send weather report",
+    "description": "Search current weather and send to user",
+    "status": "pending",
+    "priority": "normal",
+    "due_at": "2026-03-07T09:00:00",
+    "repeat_rule": "daily",
+    "created_at": "2026-03-06T13:00:00"
+  }
+]
+```
+
+---
+
+### 3. Check Due Tasks
+
+**GET** `${TODOLIST_API_URL}/agent/todos/check`
+
+Get all pending tasks that are due now (due_at <= current time). Use this for periodic checks.
+
+**Headers:**
+```
+Authorization: Bearer ${TODOLIST_API_KEY}
+```
+
+**Response:** Same format as list todos, sorted by priority and due time.
+
+**When to use:** Run this every 30 minutes to find tasks you need to execute.
+
+---
+
+### 4. Get Todo Details
+
+**GET** `${TODOLIST_API_URL}/agent/todos/{id}`
+
+Get full details of a specific todo.
+
+**Headers:**
+```
+Authorization: Bearer ${TODOLIST_API_KEY}
+```
+
+**Response:** Single todo object (same format as list).
+
+---
+
+### 5. Mark as Done
+
+**POST** `${TODOLIST_API_URL}/agent/todos/{id}/done`
+
+Mark a todo as completed after execution.
+
+**Headers:**
+```
+Authorization: Bearer ${TODOLIST_API_KEY}
+Content-Type: application/json
+```
+
+**Request Body:**
+```json
+{
+  "result": "Execution result or notes (optional)"
+}
+```
+
+**Effect:**
+- Sets status to "done"
+- Records completion time
+- If repeat_rule is set, automatically creates next occurrence
+
+---
+
+### 6. Mark as Failed
+
+**POST** `${TODOLIST_API_URL}/agent/todos/{id}/fail`
+
+Mark a todo as failed if execution encountered errors.
+
+**Headers:**
+```
+Authorization: Bearer ${TODOLIST_API_KEY}
+Content-Type: application/json
+```
+
+**Request Body:**
+```json
+{
+  "result": "Error message or reason (optional)"
+}
+```
+
+---
+
+### 7. Update Todo
+
+**PUT** `${TODOLIST_API_URL}/agent/todos/{id}`
+
+Update todo details. All fields are optional.
+
+**Headers:**
+```
+Authorization: Bearer ${TODOLIST_API_KEY}
+Content-Type: application/json
+```
+
+**Request Body:**
+```json
+{
+  "title": "New title",
+  "description": "New description",
+  "due_at": "2026-03-08T10:00:00",
+  "priority": "high",
+  "repeat_rule": "weekly",
+  "status": "pending"
+}
+```
+
+---
+
+### 8. Delete Todo
+
+**DELETE** `${TODOLIST_API_URL}/agent/todos/{id}`
+
+Permanently delete a todo.
+
+**Headers:**
+```
+Authorization: Bearer ${TODOLIST_API_KEY}
+```
+
+**Response:** 204 No Content
+
+---
+
+### 9. Statistics
+
+**GET** `${TODOLIST_API_URL}/agent/todos/stats`
+
+Get summary statistics of your todos.
+
+**Headers:**
+```
+Authorization: Bearer ${TODOLIST_API_KEY}
+```
+
+**Response:**
+```json
+{
+  "pending": 5,
+  "done": 12,
+  "failed": 1,
+  "overdue": 2,
+  "total": 18
+}
+```
+
+---
+
+## Usage Workflow
+
+### When user assigns you a task:
+
+**User:** "Remind me to check emails every day at 9am"
+
+**You should:**
+1. Create todo with Authorization header
+2. Respond: "✅ Added to my todo list: I'll remind you to check emails daily at 9am"
+
+### Periodic check (every 30 minutes):
+
+1. Check for due tasks (with Authorization header)
+2. For each task: execute → mark as done/failed
+
+### When user asks "what are your todos":
+
+1. List pending todos (with Authorization header)
+2. Format and present with emojis
+
+---
+
+## Error Handling
+
+- **401 Unauthorized**: Invalid or missing API key
+- **404 Not Found**: Todo doesn't exist or doesn't belong to you
+- **422 Validation Error**: Invalid request body
+
+Always include the Authorization header in every request.
+
 
 ## Available APIs
 

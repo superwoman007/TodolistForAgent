@@ -14,6 +14,7 @@ from ..schemas.agent_todo import (
     AgentTodoOut,
     AgentTodoStats,
 )
+from ..dependencies_agent import get_agent_id
 
 router = APIRouter(prefix="/agent/todos", tags=["agent-todos"])
 
@@ -33,13 +34,14 @@ def _next_due(current_due: datetime, rule: str) -> datetime | None:
 # ── 查询待办列表 ──────────────────────────────────────────
 @router.get("", response_model=list[AgentTodoOut])
 def list_agent_todos(
+    agent_id: str = Depends(get_agent_id),
     status: str = Query("pending", description="pending / done / failed / all"),
     due_before: str | None = Query(None, description="ISO datetime 或 'now'，筛选到期任务"),
     priority: str | None = Query(None, description="low / normal / high / urgent"),
     limit: int = Query(50, ge=1, le=200),
     db: Session = Depends(get_session),
 ):
-    stmt = select(AgentTodo)
+    stmt = select(AgentTodo).where(AgentTodo.agent_id == agent_id)
 
     if status != "all":
         stmt = stmt.where(AgentTodo.status == status)
@@ -61,10 +63,14 @@ def list_agent_todos(
 
 # ── 获取到期待执行任务（巡检接口） ───────────────────────────
 @router.get("/check", response_model=list[AgentTodoOut])
-def check_due_todos(db: Session = Depends(get_session)):
+def check_due_todos(
+    agent_id: str = Depends(get_agent_id),
+    db: Session = Depends(get_session)
+):
     now = datetime.now(timezone.utc)
     stmt = (
         select(AgentTodo)
+        .where(AgentTodo.agent_id == agent_id)
         .where(AgentTodo.status == "pending")
         .where(AgentTodo.due_at <= now)
         .order_by(AgentTodo.priority.desc(), AgentTodo.due_at.asc())
@@ -74,21 +80,33 @@ def check_due_todos(db: Session = Depends(get_session)):
 
 # ── 统计信息 ──────────────────────────────────────────────
 @router.get("/stats", response_model=AgentTodoStats)
-def get_stats(db: Session = Depends(get_session)):
+def get_stats(
+    agent_id: str = Depends(get_agent_id),
+    db: Session = Depends(get_session)
+):
     now = datetime.now(timezone.utc)
 
-    total = db.execute(select(sa_func.count(AgentTodo.id))).scalar() or 0
+    total = db.execute(
+        select(sa_func.count(AgentTodo.id)).where(AgentTodo.agent_id == agent_id)
+    ).scalar() or 0
     pending = db.execute(
-        select(sa_func.count(AgentTodo.id)).where(AgentTodo.status == "pending")
+        select(sa_func.count(AgentTodo.id))
+        .where(AgentTodo.agent_id == agent_id)
+        .where(AgentTodo.status == "pending")
     ).scalar() or 0
     done = db.execute(
-        select(sa_func.count(AgentTodo.id)).where(AgentTodo.status == "done")
+        select(sa_func.count(AgentTodo.id))
+        .where(AgentTodo.agent_id == agent_id)
+        .where(AgentTodo.status == "done")
     ).scalar() or 0
     failed = db.execute(
-        select(sa_func.count(AgentTodo.id)).where(AgentTodo.status == "failed")
+        select(sa_func.count(AgentTodo.id))
+        .where(AgentTodo.agent_id == agent_id)
+        .where(AgentTodo.status == "failed")
     ).scalar() or 0
     overdue = db.execute(
         select(sa_func.count(AgentTodo.id))
+        .where(AgentTodo.agent_id == agent_id)
         .where(AgentTodo.status == "pending")
         .where(AgentTodo.due_at <= now)
     ).scalar() or 0
@@ -100,8 +118,12 @@ def get_stats(db: Session = Depends(get_session)):
 
 # ── 创建待办 ──────────────────────────────────────────────
 @router.post("", response_model=AgentTodoOut, status_code=201)
-def create_agent_todo(req: AgentTodoCreate, db: Session = Depends(get_session)):
-    todo = AgentTodo(**req.model_dump())
+def create_agent_todo(
+    req: AgentTodoCreate,
+    agent_id: str = Depends(get_agent_id),
+    db: Session = Depends(get_session)
+):
+    todo = AgentTodo(agent_id=agent_id, **req.model_dump())
     db.add(todo)
     db.commit()
     db.refresh(todo)
@@ -110,8 +132,16 @@ def create_agent_todo(req: AgentTodoCreate, db: Session = Depends(get_session)):
 
 # ── 获取待办详情 ──────────────────────────────────────────
 @router.get("/{todo_id}", response_model=AgentTodoOut)
-def get_agent_todo(todo_id: int, db: Session = Depends(get_session)):
-    todo = db.get(AgentTodo, todo_id)
+def get_agent_todo(
+    todo_id: int,
+    agent_id: str = Depends(get_agent_id),
+    db: Session = Depends(get_session)
+):
+    todo = db.execute(
+        select(AgentTodo)
+        .where(AgentTodo.id == todo_id)
+        .where(AgentTodo.agent_id == agent_id)
+    ).scalar_one_or_none()
     if not todo:
         raise HTTPException(status_code=404, detail="Agent todo not found")
     return todo
@@ -120,9 +150,16 @@ def get_agent_todo(todo_id: int, db: Session = Depends(get_session)):
 # ── 更新待办 ──────────────────────────────────────────────
 @router.put("/{todo_id}", response_model=AgentTodoOut)
 def update_agent_todo(
-    todo_id: int, req: AgentTodoUpdate, db: Session = Depends(get_session)
+    todo_id: int,
+    req: AgentTodoUpdate,
+    agent_id: str = Depends(get_agent_id),
+    db: Session = Depends(get_session)
 ):
-    todo = db.get(AgentTodo, todo_id)
+    todo = db.execute(
+        select(AgentTodo)
+        .where(AgentTodo.id == todo_id)
+        .where(AgentTodo.agent_id == agent_id)
+    ).scalar_one_or_none()
     if not todo:
         raise HTTPException(status_code=404, detail="Agent todo not found")
     for k, v in req.model_dump(exclude_unset=True).items():
@@ -136,9 +173,16 @@ def update_agent_todo(
 # ── 标记完成 ──────────────────────────────────────────────
 @router.post("/{todo_id}/done", response_model=AgentTodoOut)
 def mark_done(
-    todo_id: int, req: AgentTodoDone, db: Session = Depends(get_session)
+    todo_id: int,
+    req: AgentTodoDone,
+    agent_id: str = Depends(get_agent_id),
+    db: Session = Depends(get_session)
 ):
-    todo = db.get(AgentTodo, todo_id)
+    todo = db.execute(
+        select(AgentTodo)
+        .where(AgentTodo.id == todo_id)
+        .where(AgentTodo.agent_id == agent_id)
+    ).scalar_one_or_none()
     if not todo:
         raise HTTPException(status_code=404, detail="Agent todo not found")
 
@@ -154,6 +198,7 @@ def mark_done(
         next_due = _next_due(todo.due_at, todo.repeat_rule)
         if next_due:
             next_todo = AgentTodo(
+                agent_id=agent_id,
                 title=todo.title,
                 description=todo.description,
                 priority=todo.priority,
@@ -172,9 +217,16 @@ def mark_done(
 # ── 标记失败 ──────────────────────────────────────────────
 @router.post("/{todo_id}/fail", response_model=AgentTodoOut)
 def mark_failed(
-    todo_id: int, req: AgentTodoDone, db: Session = Depends(get_session)
+    todo_id: int,
+    req: AgentTodoDone,
+    agent_id: str = Depends(get_agent_id),
+    db: Session = Depends(get_session)
 ):
-    todo = db.get(AgentTodo, todo_id)
+    todo = db.execute(
+        select(AgentTodo)
+        .where(AgentTodo.id == todo_id)
+        .where(AgentTodo.agent_id == agent_id)
+    ).scalar_one_or_none()
     if not todo:
         raise HTTPException(status_code=404, detail="Agent todo not found")
 
@@ -192,8 +244,16 @@ def mark_failed(
 
 # ── 删除待办 ──────────────────────────────────────────────
 @router.delete("/{todo_id}", status_code=204)
-def delete_agent_todo(todo_id: int, db: Session = Depends(get_session)):
-    todo = db.get(AgentTodo, todo_id)
+def delete_agent_todo(
+    todo_id: int,
+    agent_id: str = Depends(get_agent_id),
+    db: Session = Depends(get_session)
+):
+    todo = db.execute(
+        select(AgentTodo)
+        .where(AgentTodo.id == todo_id)
+        .where(AgentTodo.agent_id == agent_id)
+    ).scalar_one_or_none()
     if not todo:
         raise HTTPException(status_code=404, detail="Agent todo not found")
     db.delete(todo)

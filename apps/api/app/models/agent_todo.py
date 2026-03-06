@@ -9,6 +9,7 @@ class AgentTodo(Base):
     __tablename__ = "agent_todos"
 
     id = Column(Integer, primary_key=True, index=True)
+    agent_id = Column(String(255), nullable=False, index=True)
     title = Column(String(255), nullable=False)
     description = Column(Text, nullable=True)           # 执行指令说明
     status = Column(String(50), default="pending", index=True)  # pending / done / failed

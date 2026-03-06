@@ -9,6 +9,7 @@ from .routers.subtasks import router as subtasks_router
 from .routers.reminders import router as reminders_router
 from .routers.scene_templates import router as scene_templates_router
 from .routers.agent_todos import router as agent_todos_router
+from .routers.agent_credentials import router as agent_credentials_router
 
 
 @asynccontextmanager
@@ -40,6 +41,7 @@ def create_app() -> FastAPI:
     application.include_router(reminders_router)
     application.include_router(scene_templates_router)
     application.include_router(agent_todos_router)
+    application.include_router(agent_credentials_router)
 
     return application
 
