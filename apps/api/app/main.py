@@ -2,12 +2,6 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from .db.init_db import init_db
-from .routers.auth import router as auth_router
-from .routers.todos import router as todos_router
-from .routers.tags import router as tags_router
-from .routers.subtasks import router as subtasks_router
-from .routers.reminders import router as reminders_router
-from .routers.scene_templates import router as scene_templates_router
 from .routers.agent_todos import router as agent_todos_router
 from .routers.agent_credentials import router as agent_credentials_router
 from .routers.agent_subtasks import router as agent_subtasks_router
@@ -21,7 +15,7 @@ async def lifespan(application: FastAPI):
 
 
 def create_app() -> FastAPI:
-    application = FastAPI(title="TodoList API", version="0.2.0", lifespan=lifespan)
+    application = FastAPI(title="Agent TodoList API", version="1.0.0", lifespan=lifespan)
 
     application.add_middleware(
         CORSMiddleware,
@@ -35,12 +29,6 @@ def create_app() -> FastAPI:
     def health():
         return {"status": "ok"}
 
-    application.include_router(auth_router)
-    application.include_router(todos_router)
-    application.include_router(tags_router)
-    application.include_router(subtasks_router)
-    application.include_router(reminders_router)
-    application.include_router(scene_templates_router)
     application.include_router(agent_todos_router)
     application.include_router(agent_credentials_router)
     application.include_router(agent_subtasks_router)
