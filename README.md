@@ -1,43 +1,67 @@
 # Agent TodoList
 
-> Give your AI agent a real task system — todos, subtasks, recurring schedules, priorities, and execution records.
+> The missing task backend for AI agents.
 
-一个给 AI Agent 用的待办系统：不仅能记任务，还能让 Agent **自主查询、执行、回写结果**。
+为 AI Agent 而生的 Todo 后端：支持 **任务创建、子任务拆解、周期调度、到期检查、执行回写、结果追踪**。
 
-如果你在做 OpenClaw、自动化助手、AI 管家、工作流 Agent，这个项目就是把“提醒事项”升级成“Agent 可执行任务栈”的那块基础设施。
+不是给人手动点按钮的 Todo App。  
+而是给 **OpenClaw / AI Assistant / Autonomous Agent** 直接接入的任务系统。
 
-## Why This Project
+## Why People Star This
 
-大多数 Todo 工具是给人点点点用的，不是给 Agent 调 API 用的。
+现在很多 Agent 能聊天、能调用工具、能写代码，**但没有一个真正像样的任务系统**：
 
-`Agent TodoList` 的目标很直接：
+- 任务记不住
+- 复杂工作拆不开
+- 到点了不会主动执行
+- 做完了没有结果沉淀
+- 周期任务全靠临时拼逻辑
 
-- 让 Agent 拥有自己的任务队列
-- 让每个 Agent 拥有独立认证和数据空间
-- 让复杂任务可以拆成 subtasks 分步完成
-- 让周期任务自动生成下一次执行项
-- 让任务结果可以被记录、追踪、统计
+`Agent TodoList` 就是补这块空白的。
 
-一句话：**它不是一个“待办 UI”，而是一个“给 AI Agent 用的任务后端”。**
+它把“提醒事项”升级成了 **Agent 可执行任务基础设施**：
 
-## Features
+- Agent 自己创建任务
+- Agent 自己轮询到期任务
+- Agent 自己执行并回写结果
+- 复杂任务可拆成 subtasks
+- 重复任务自动生成下一次
 
-- 🔐 **Per-Agent API Key**：每个 Agent 独立身份、独立数据隔离
-- ✅ **Agent-native Todo API**：面向 Agent 设计，不是把人类产品硬改成接口
-- 🧩 **Subtasks**：复杂任务可拆解、可逐步完成
+一句话：
+
+> **If your agent can think and act, it also needs a task system.**
+
+## Highlights
+
+- 🔐 **Per-Agent Isolation**：每个 Agent 独立 API Key、独立任务空间
+- ✅ **Agent-First API**：从 Agent 调用视角设计，不是人类产品接口魔改
+- 🧩 **Subtasks Built In**：适合拆解复杂任务和多步骤执行
 - 🔁 **Recurring Tasks**：支持 daily / weekly / monthly 周期任务
-- ⏰ **Due Task Checking**：可轮询到期任务，适合定时执行器
-- 📊 **Execution Stats**：待办、完成、失败、逾期一目了然
-- 🪶 **Lightweight Stack**：FastAPI + SQLite，启动快，部署轻
-- 🤖 **OpenClaw Skill Included**：开箱可接入 Agent 工作流
+- ⏰ **Due Task Polling**：天然适合 cron、heartbeat、scheduler、worker
+- 📊 **Execution Trace**：记录待办、完成、失败、逾期与执行结果
+- 🪶 **Lightweight & Hackable**：FastAPI + SQLite，轻量、直观、容易二次开发
+- 🤖 **OpenClaw Skill Included**：不是“兼容”，是已经能接
 
-## Typical Use Cases
+## What You Can Build With It
 
-- AI 助手定时检查邮件、日历、消息
-- Agent 自动执行周期巡检任务
-- 复杂工作拆成多步 subtasks 顺序推进
-- 智能秘书记录“之后帮我做”的事项
-- 私人自动化系统的任务中枢 / Agent memory layer
+- 会定时提醒、定时检查、定时执行的 AI 助手
+- 能把复杂任务拆成多步推进的 Autonomous Agent
+- 私人数字秘书 / Personal AI OS
+- 具备“之后帮我做这件事”能力的聊天机器人
+- 你自己 Agent stack 里的任务中台
+
+## Demo Mindset
+
+想象一下你的 Agent 收到这些话：
+
+> “每天早上 9 点提醒我处理邮件。”  
+> “周五前帮我准备汇报，拆成几步慢慢做。”  
+> “每 30 分钟检查一次有没有到期任务。”
+
+大部分项目做到“理解这句话”就结束了。  
+这个项目解决的是下一步：
+
+**理解之后，怎么把任务可靠地存起来、追踪起来、执行起来。**
 
 ## How It Works
 
@@ -51,13 +75,14 @@ Agent TodoList API
 Todos / Subtasks / Recurring Rules / Results
 ```
 
-典型流程：
+典型执行流：
 
 1. 用户或系统创建任务
-2. Agent 定期调用 `/agent/todos/check`
-3. 获取已到期任务并执行
-4. 成功后标记 done，失败则标记 fail
-5. 如果是重复任务，系统自动生成下一次任务
+2. Agent 调用 `/agent/todos/check`
+3. 获取已到期任务
+4. 执行任务或逐个执行 subtasks
+5. 成功则标记 done，失败则标记 fail
+6. 若为周期任务，系统自动生成下一次任务
 
 ## Project Structure
 
@@ -155,25 +180,26 @@ cp -r skills/todolist-agent ~/.openclaw/skills/
 }
 ```
 
-这样你的 Agent 就能：
+接入后你的 Agent 可以：
 
 - 创建任务
 - 查询待办
-- 获取到期任务
-- 标记完成/失败
+- 拉取到期任务
+- 标记完成 / 失败
 - 管理 subtasks
+- 构建自己的任务循环
 
 ## Example Scenarios
 
-### Scenario 1: recurring reminder
+### 1. Recurring reminder
 
 用户说：
 
 > 每天早上 9 点提醒我看邮件
 
-Agent 可以创建一个 `daily` 周期任务；每次完成后，系统自动生成下一次任务。
+Agent 创建一个 `daily` 周期任务；每次完成后，系统自动生成下一次。
 
-### Scenario 2: complex work execution
+### 2. Complex task execution
 
 用户说：
 
@@ -186,9 +212,9 @@ Agent 可以拆成：
 - 制作幻灯片
 - 预演汇报
 
-每一步都能独立追踪，不会一坨糊在一起。
+每一步都能独立追踪，而不是只留下一个“准备汇报”的大黑盒。
 
-### Scenario 3: autonomous periodic checks
+### 3. Autonomous periodic checks
 
 Agent 每 30 分钟调用一次：
 
@@ -196,7 +222,7 @@ Agent 每 30 分钟调用一次：
 GET /agent/todos/check
 ```
 
-拿到到期任务后自动执行，再写回执行结果。
+拿到到期任务后自动执行，再把结果写回系统。
 
 ## Core API
 
@@ -233,25 +259,23 @@ GET /agent/todos/check
 - `skills/todolist-agent/SKILL.md`
 - `http://localhost:8000/docs`
 
-## Why It Can Be Interesting on GitHub
+## Why This Repo Has Potential
 
-这个项目比较容易让人点星，核心是它踩在几个很容易传播的话题上：
+这个仓库容易吸引开发者，不是因为它“功能很多”，而是因为它的定位非常清晰：
 
-- `AI Agent infrastructure`
-- `OpenClaw ecosystem`
-- `autonomous task execution`
-- `personal AI assistant`
-- `FastAPI micro-backend`
+- 它踩中 `AI Agent infrastructure`
+- 它解决的是一个真实空缺，不是伪需求
+- 它够小，开发者一眼能看懂
+- 它够实用，别人拿去就能塞进自己项目里
+- 它适合做独立模块，也适合做大系统一部分
 
-它不是泛泛而谈的 “AI TODO App”，而是一个非常具体、很容易让开发者代入自己项目的基础模块：
+这类项目最容易出现一句让人想 star 的反应：
 
-> “如果我的 Agent 也需要一个能执行、能回写、能周期调度的任务系统，我是不是直接能拿这个用？”
-
-这类仓库更容易获得收藏、复用、二次开发和转发。
+> “卧槽，这不就是我正想给 Agent 补的那块吗？”
 
 ## Roadmap
 
-- [ ] Docker compose 一键启动
+- [ ] Docker Compose 一键启动
 - [ ] PostgreSQL support
 - [ ] Webhook / event callbacks
 - [ ] Task labels / tags
@@ -274,4 +298,4 @@ MIT
 
 ---
 
-如果你在做 AI Agent、自动化助手、数字管家，欢迎 star、fork、提 issue，一起把“Agent 的任务系统”做成真正可复用的基础设施。
+如果你也觉得 **Agent 不该只有大脑和工具，还该有任务系统**，欢迎 star、fork、提 issue，一起把这块基础设施做扎实。
