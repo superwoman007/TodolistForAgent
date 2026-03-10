@@ -228,9 +228,42 @@ But this should be treated as a compatibility path, not the preferred setup for 
 If you host TodoList as a central server for other agents, those agents should:
 
 1. install the `todolist-agent` skill locally
-2. receive a server-issued runtime config file or equivalent runtime values
-3. point `apiUrl` / `TODOLIST_API_URL` to **your** hosted backend
+2. run the initialization script to configure runtime settings (see below)
+3. point `apiUrl` to **your** hosted backend
 4. use a **server-issued dedicated API key** for that agent
+
+### Initialization script for centrally managed agents
+
+For centrally managed agents, use the init script to configure runtime settings without editing `openclaw.json`:
+
+```bash
+# Clone or copy the repository
+git clone https://github.com/yourrepo/TodoList.git
+cd TodoList
+
+# Install the skill
+cp -r skills/todolist-agent ~/.openclaw/skills/
+
+# Initialize runtime config (required for skill to work)
+./scripts/todolist-agent-init.sh \
+  --api-url https://todo.yourdomain.com \
+  --api-key ak_server_issued_for_this_agent \
+  --agent-id agent-issued-by-server
+
+# Optional: also set up cron patrol (every 30 minutes)
+./scripts/todolist-agent-init.sh \
+  --api-url https://todo.yourdomain.com \
+  --api-key ak_server_issued_for_this_agent \
+  --agent-id agent-issued-by-server \
+  --cron
+```
+
+The init script:
+- Creates/updates `~/.openclaw/todolist-agent.json` with your credentials
+- Is idempotent (safe to re-run; only updates if values change)
+- With `--cron`, creates or updates an **OpenClaw cron job** that patrols every 30 minutes
+
+To reconfigure later, simply run the script again with new values.
 
 ### Current identity model (important)
 
