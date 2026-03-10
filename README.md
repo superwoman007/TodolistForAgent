@@ -191,51 +191,46 @@ Test coverage includes:
 cp -r skills/todolist-agent ~/.openclaw/skills/
 ```
 
-### Local backend mode
+### Recommended runtime config (no OpenClaw restart)
 
-在 `~/.openclaw/openclaw.json` 中配置：
+Do **not** rely on editing `~/.openclaw/openclaw.json` for per-agent TodoList connection settings, because that may require restarting OpenClaw.
+
+Instead, provide a separate runtime config file:
+
+`~/.openclaw/todolist-agent.json`
+
+Example:
 
 ```json
 {
-  "skills": {
-    "entries": {
-      "todolist-agent": {
-        "enabled": true,
-        "env": {
-          "TODOLIST_API_URL": "http://localhost:8000",
-          "TODOLIST_API_KEY": "ak_your_key_here"
-        }
-      }
-    }
-  }
+  "apiUrl": "https://todo.yourdomain.com",
+  "apiKey": "ak_server_issued_for_this_agent",
+  "agentId": "agent-issued-by-server"
 }
 ```
+
+Recommended behavior for host agents using this skill:
+- install the skill once
+- update `~/.openclaw/todolist-agent.json` when connection info changes
+- avoid using `~/.openclaw/openclaw.json` for these per-agent runtime values
+
+### Backward-compatible env mode
+
+If a host environment already injects runtime env vars without requiring restart, the skill may still use:
+
+- `TODOLIST_API_URL`
+- `TODOLIST_API_KEY`
+
+But this should be treated as a compatibility path, not the preferred setup for centrally managed agents.
 
 ### Central server mode
 
 If you host TodoList as a central server for other agents, those agents should:
 
 1. install the `todolist-agent` skill locally
-2. point `TODOLIST_API_URL` to **your** hosted backend
-3. use a **server-issued dedicated API key** for that agent
-
-Example:
-
-```json
-{
-  "skills": {
-    "entries": {
-      "todolist-agent": {
-        "enabled": true,
-        "env": {
-          "TODOLIST_API_URL": "https://todo.yourdomain.com",
-          "TODOLIST_API_KEY": "ak_server_issued_for_this_agent"
-        }
-      }
-    }
-  }
-}
-```
+2. receive a server-issued runtime config file or equivalent runtime values
+3. point `apiUrl` / `TODOLIST_API_URL` to **your** hosted backend
+4. use a **server-issued dedicated API key** for that agent
 
 ### Current identity model (important)
 

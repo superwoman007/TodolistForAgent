@@ -2,25 +2,48 @@
 name: todolist-agent
 description: Your personal todo list for tracking tasks you need to execute. Create, check, and complete your own todos with subtasks support.
 user-invocable: true
-metadata: {"openclaw": {"requires": {"env": ["TODOLIST_API_URL", "TODOLIST_API_KEY"]}, "emoji": "✅"}}
+metadata: {"openclaw": {"emoji": "✅"}}
 ---
 
 # Agent TodoList
 
 This is YOUR personal todo list. Use it to track tasks you need to execute yourself. Supports subtasks for complex tasks.
 
+## Runtime configuration
+
+Preferred runtime config source:
+
+- `~/.openclaw/todolist-agent.json`
+
+Example:
+
+```json
+{
+  "apiUrl": "https://todo.yourdomain.com",
+  "apiKey": "ak_server_issued_for_this_agent",
+  "agentId": "agent-issued-by-server"
+}
+```
+
+Compatibility fallback:
+
+- `TODOLIST_API_URL`
+- `TODOLIST_API_KEY`
+
+Prefer the JSON file for centrally managed agents because updating it should not require restarting OpenClaw.
+
 ## Authentication
 
-All API calls require the Authorization header:
+All API calls require the Authorization header using the configured API key.
 
-```
-Authorization: Bearer ${TODOLIST_API_KEY}
+```http
+Authorization: Bearer <apiKey>
 Content-Type: application/json
 ```
 
 ## Base URL
 
-`${TODOLIST_API_URL}` (default: http://localhost:8000)
+Use the configured `apiUrl`. If env fallback is used, that corresponds to `${TODOLIST_API_URL}`.
 
 ## Identity and provisioning note
 
@@ -29,6 +52,7 @@ This skill assumes the host agent has already been provisioned with a valid conn
 In a centralized server setup:
 - the backend URL and API key are supplied by the server/operator
 - different agents should use different API keys
+- prefer shipping/updating a local runtime config file instead of requiring `openclaw.json` edits
 - current versions use a simple identity model: if an agent loses its local binding/config and is provisioned again, it is treated as a **new agent** and gets a **new task space**
 - recovery of the previous space after local identity loss is **not supported yet**
 
@@ -38,7 +62,7 @@ In a centralized server setup:
 
 ### 1. Create Todo
 
-**POST** `${TODOLIST_API_URL}/agent/todos`
+**POST** `{apiUrl}/agent/todos`
 
 ```json
 {
@@ -59,7 +83,7 @@ Fields:
 
 ### 2. List Todos
 
-**GET** `${TODOLIST_API_URL}/agent/todos?status=pending&due_before=now&priority=high&limit=50`
+**GET** `{apiUrl}/agent/todos?status=pending&due_before=now&priority=high&limit=50`
 
 Query parameters:
 - `status`: `pending` | `done` | `failed` | `all` (default: pending)
@@ -69,7 +93,7 @@ Query parameters:
 
 ### 3. Check Due Tasks (for periodic checks)
 
-**GET** `${TODOLIST_API_URL}/agent/todos/check`
+**GET** `{apiUrl}/agent/todos/check`
 
 Returns all pending tasks where `due_at <= now`, sorted by priority. Run this every 30 minutes.
 
