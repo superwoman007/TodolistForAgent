@@ -3,8 +3,9 @@
 # 返回值：标准 RESTful JSON 响应
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
-from sqlalchemy import select, func as sa_func
+from sqlalchemy import select, func as sa_func, case
 from datetime import datetime, timezone, timedelta
+import calendar
 from ..db.session import get_session
 from ..models.agent_todo import AgentTodo
 from ..schemas.agent_todo import (
@@ -18,6 +19,29 @@ from ..dependencies_agent import get_agent_id
 
 router = APIRouter(prefix="/agent/todos", tags=["agent-todos"])
 
+PRIORITY_WEIGHT = case(
+    (AgentTodo.priority == "urgent", 4),
+    (AgentTodo.priority == "high", 3),
+    (AgentTodo.priority == "normal", 2),
+    (AgentTodo.priority == "low", 1),
+    else_=0
+)
+
+
+def _add_months(dt: datetime, months: int) -> datetime:
+    """Add months to a datetime, handling end-of-month edge cases.
+    
+    If the resulting month has fewer days than the original day,
+    the day is clamped to the last day of the month.
+    """
+    year = dt.year + (dt.month - 1 + months) // 12
+    month = (dt.month - 1 + months) % 12 + 1
+    
+    max_day = calendar.monthrange(year, month)[1]
+    day = min(dt.day, max_day)
+    
+    return dt.replace(year=year, month=month, day=day)
+
 
 def _next_due(current_due: datetime, rule: str) -> datetime | None:
     """根据重复规则计算下一次执行时间"""
@@ -26,8 +50,7 @@ def _next_due(current_due: datetime, rule: str) -> datetime | None:
     elif rule == "weekly":
         return current_due + timedelta(weeks=1)
     elif rule == "monthly":
-        # 简单处理：加 30 天
-        return current_due + timedelta(days=30)
+        return _add_months(current_due, 1)
     return None
 
 
@@ -73,7 +96,7 @@ def check_due_todos(
         .where(AgentTodo.agent_id == agent_id)
         .where(AgentTodo.status == "pending")
         .where(AgentTodo.due_at <= now)
-        .order_by(AgentTodo.priority.desc(), AgentTodo.due_at.asc())
+        .order_by(PRIORITY_WEIGHT.desc(), AgentTodo.due_at.asc())
     )
     return db.execute(stmt).scalars().all()
 

@@ -282,3 +282,233 @@ def test_todo_not_found_different_agent(client, db):
         headers={"Authorization": "Bearer ak_key2"}
     )
     assert response.status_code == 404
+
+
+def test_update_todo(client, db):
+    cred = AgentCredential(agent_id="test-agent", api_key="ak_testkey123")
+    db.add(cred)
+    db.commit()
+    
+    create_resp = client.post(
+        "/agent/todos",
+        headers={"Authorization": "Bearer ak_testkey123"},
+        json={"title": "Original title", "priority": "low"}
+    )
+    todo_id = create_resp.json()["id"]
+    
+    response = client.put(
+        f"/agent/todos/{todo_id}",
+        headers={"Authorization": "Bearer ak_testkey123"},
+        json={"title": "Updated title", "priority": "high"}
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["title"] == "Updated title"
+    assert data["priority"] == "high"
+
+
+def test_update_todo_not_found(client, db):
+    cred = AgentCredential(agent_id="test-agent", api_key="ak_testkey123")
+    db.add(cred)
+    db.commit()
+    
+    response = client.put(
+        "/agent/todos/99999",
+        headers={"Authorization": "Bearer ak_testkey123"},
+        json={"title": "Updated title"}
+    )
+    assert response.status_code == 404
+
+
+def test_mark_failed(client, db):
+    cred = AgentCredential(agent_id="test-agent", api_key="ak_testkey123")
+    db.add(cred)
+    db.commit()
+    
+    create_resp = client.post(
+        "/agent/todos",
+        headers={"Authorization": "Bearer ak_testkey123"},
+        json={"title": "Task that will fail"}
+    )
+    todo_id = create_resp.json()["id"]
+    
+    response = client.post(
+        f"/agent/todos/{todo_id}/fail",
+        headers={"Authorization": "Bearer ak_testkey123"},
+        json={"result": "Task failed due to error"}
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status"] == "failed"
+    assert data["result"] == "Task failed due to error"
+
+
+def test_mark_failed_not_found(client, db):
+    cred = AgentCredential(agent_id="test-agent", api_key="ak_testkey123")
+    db.add(cred)
+    db.commit()
+    
+    response = client.post(
+        "/agent/todos/99999/fail",
+        headers={"Authorization": "Bearer ak_testkey123"},
+        json={"result": "Failed"}
+    )
+    assert response.status_code == 404
+
+
+def test_delete_todo(client, db):
+    cred = AgentCredential(agent_id="test-agent", api_key="ak_testkey123")
+    db.add(cred)
+    db.commit()
+    
+    create_resp = client.post(
+        "/agent/todos",
+        headers={"Authorization": "Bearer ak_testkey123"},
+        json={"title": "Task to delete"}
+    )
+    todo_id = create_resp.json()["id"]
+    
+    response = client.delete(
+        f"/agent/todos/{todo_id}",
+        headers={"Authorization": "Bearer ak_testkey123"}
+    )
+    assert response.status_code == 204
+    
+    get_resp = client.get(
+        f"/agent/todos/{todo_id}",
+        headers={"Authorization": "Bearer ak_testkey123"}
+    )
+    assert get_resp.status_code == 404
+
+
+def test_delete_todo_not_found(client, db):
+    cred = AgentCredential(agent_id="test-agent", api_key="ak_testkey123")
+    db.add(cred)
+    db.commit()
+    
+    response = client.delete(
+        "/agent/todos/99999",
+        headers={"Authorization": "Bearer ak_testkey123"}
+    )
+    assert response.status_code == 404
+
+
+def test_check_due_todos_priority_order(client, db):
+    from datetime import datetime, timezone, timedelta
+    cred = AgentCredential(agent_id="test-agent", api_key="ak_testkey123")
+    db.add(cred)
+    db.commit()
+    
+    now = datetime.now(timezone.utc)
+    past = now - timedelta(hours=1)
+    
+    client.post(
+        "/agent/todos",
+        headers={"Authorization": "Bearer ak_testkey123"},
+        json={"title": "Low priority", "priority": "low", "due_at": past.isoformat()}
+    )
+    client.post(
+        "/agent/todos",
+        headers={"Authorization": "Bearer ak_testkey123"},
+        json={"title": "Urgent priority", "priority": "urgent", "due_at": past.isoformat()}
+    )
+    client.post(
+        "/agent/todos",
+        headers={"Authorization": "Bearer ak_testkey123"},
+        json={"title": "Normal priority", "priority": "normal", "due_at": past.isoformat()}
+    )
+    client.post(
+        "/agent/todos",
+        headers={"Authorization": "Bearer ak_testkey123"},
+        json={"title": "High priority", "priority": "high", "due_at": past.isoformat()}
+    )
+    
+    response = client.get(
+        "/agent/todos/check",
+        headers={"Authorization": "Bearer ak_testkey123"}
+    )
+    assert response.status_code == 200
+    todos = response.json()
+    assert len(todos) == 4
+    assert todos[0]["priority"] == "urgent"
+    assert todos[1]["priority"] == "high"
+    assert todos[2]["priority"] == "normal"
+    assert todos[3]["priority"] == "low"
+
+
+def test_monthly_recurring_calendar_month(client, db):
+    from datetime import datetime, timezone
+    cred = AgentCredential(agent_id="test-agent", api_key="ak_testkey123")
+    db.add(cred)
+    db.commit()
+    
+    due_at = datetime(2024, 1, 31, 10, 0, tzinfo=timezone.utc)
+    response = client.post(
+        "/agent/todos",
+        headers={"Authorization": "Bearer ak_testkey123"},
+        json={
+            "title": "Monthly task",
+            "repeat_rule": "monthly",
+            "due_at": due_at.isoformat()
+        }
+    )
+    todo_id = response.json()["id"]
+    
+    mark_done_resp = client.post(
+        f"/agent/todos/{todo_id}/done",
+        headers={"Authorization": "Bearer ak_testkey123"},
+        json={}
+    )
+    assert mark_done_resp.status_code == 200
+    
+    todos_resp = client.get(
+        "/agent/todos?status=all",
+        headers={"Authorization": "Bearer ak_testkey123"}
+    )
+    todos = todos_resp.json()
+    assert len(todos) == 2
+    
+    pending_todo = next(t for t in todos if t["status"] == "pending")
+    assert pending_todo["due_at"] is not None
+    next_due = datetime.fromisoformat(pending_todo["due_at"].replace("Z", "+00:00"))
+    assert next_due.year == 2024
+    assert next_due.month == 2
+    assert next_due.day == 29
+
+
+def test_monthly_recurring_non_end_of_month(client, db):
+    from datetime import datetime, timezone
+    cred = AgentCredential(agent_id="test-agent", api_key="ak_testkey123")
+    db.add(cred)
+    db.commit()
+    
+    due_at = datetime(2024, 1, 15, 10, 0, tzinfo=timezone.utc)
+    response = client.post(
+        "/agent/todos",
+        headers={"Authorization": "Bearer ak_testkey123"},
+        json={
+            "title": "Monthly task",
+            "repeat_rule": "monthly",
+            "due_at": due_at.isoformat()
+        }
+    )
+    todo_id = response.json()["id"]
+    
+    mark_done_resp = client.post(
+        f"/agent/todos/{todo_id}/done",
+        headers={"Authorization": "Bearer ak_testkey123"},
+        json={}
+    )
+    assert mark_done_resp.status_code == 200
+    
+    todos_resp = client.get(
+        "/agent/todos?status=all",
+        headers={"Authorization": "Bearer ak_testkey123"}
+    )
+    todos = todos_resp.json()
+    
+    pending_todo = next(t for t in todos if t["status"] == "pending")
+    next_due = datetime.fromisoformat(pending_todo["due_at"].replace("Z", "+00:00"))
+    assert next_due.year == 2024
+    assert next_due.month == 2
+    assert next_due.day == 15

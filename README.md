@@ -154,6 +154,10 @@ curl -H "Authorization: Bearer YOUR_API_KEY" \
   http://localhost:8000/agent/todos/check
 ```
 
+**Priority ordering:** When polling due tasks via `/agent/todos/check`, tasks are ordered by priority weight (urgent > high > normal > low), then by due date.
+
+**Monthly recurrence:** Monthly recurring tasks advance by calendar month (e.g., Jan 31 → Feb 29), not by fixed 30 days. End-of-month dates are clamped to the last day of the target month.
+
 ## Testing
 
 Run the test suite with pytest:
