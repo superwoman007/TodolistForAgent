@@ -234,11 +234,31 @@ You:
 When this skill is available in an agent that runs on a timer / cron / heartbeat:
 
 1. Periodically call `GET /agent/todos/check`
-2. If no due tasks exist, return a short "nothing due" result and stop
+2. If no due tasks exist, stop quickly and prefer silence or a one-line minimal summary
 3. If due tasks exist, process them in returned order
 4. For tasks with subtasks, fetch subtasks first and complete actionable unfinished subtasks before finishing the parent task
 5. Mark successful work with `POST /done` and include a useful `result`
 6. Mark failures with `POST /fail` and include the error/result summary
+
+### Patrol reporting rule
+
+Use concise reporting by default.
+
+- **If no due tasks exist**: prefer no user-facing interruption; if the host requires a response, return only a very short summary such as `No due tasks.`
+- **If work was performed**: return a concise but useful summary including:
+  - how many tasks were due
+  - which tasks were completed or failed
+  - whether recurring tasks generated next items
+  - any follow-up risk or human attention needed
+- **If an execution failure happens**: clearly surface the failure reason in both the task `result` and the patrol summary
+
+### Patrol failure handling
+
+When this skill is used with a scheduler, the host agent should prefer these defaults:
+
+- alert only on repeated patrol failures rather than every isolated hiccup
+- keep patrol execution independent from delivery problems when possible
+- treat API unavailability, auth failure, or repeated execution errors as noteworthy issues worth escalating
 
 Default recommendation: run this patrol every 30 minutes unless the host agent has a stricter schedule requirement.
 
