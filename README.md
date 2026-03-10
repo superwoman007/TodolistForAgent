@@ -111,7 +111,7 @@ Todos / Subtasks / Recurring Rules / Results
 ### 1. Install dependencies
 
 ```bash
-pip install fastapi uvicorn sqlalchemy
+pip install -r requirements.txt
 ```
 
 ### 2. Start the API server
@@ -153,6 +153,23 @@ curl -X POST http://localhost:8000/agent/todos \
 curl -H "Authorization: Bearer YOUR_API_KEY" \
   http://localhost:8000/agent/todos/check
 ```
+
+## Testing
+
+Run the test suite with pytest:
+
+```bash
+cd apps/api
+pytest tests/ -v
+```
+
+Test coverage includes:
+- Health check endpoint
+- Credential creation and validation
+- Authentication failure cases
+- Todo CRUD operations
+- Recurring task behavior
+- Subtask management flow
 
 ## OpenClaw Integration
 
