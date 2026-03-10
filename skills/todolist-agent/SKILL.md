@@ -70,7 +70,7 @@ In a centralized server setup:
 For centrally managed agents, run the init script after installing the skill:
 
 ```bash
-# Default agent (main):
+# Default agent (main) - creates cron patrol by default:
 ./scripts/todolist-agent-init.sh \
   --api-url https://todo.yourdomain.com \
   --api-key ak_server_issued_for_this_agent \
@@ -83,13 +83,13 @@ For centrally managed agents, run the init script after installing the skill:
   --agent-id another-agent-id \
   --agent assistant
 
-# Optional: also enable cron patrol (every 30 minutes)
+# To skip cron patrol creation:
 ./scripts/todolist-agent-init.sh \
   --api-url https://todo.yourdomain.com \
   --api-key ak_server_issued_for_this_agent \
   --agent-id agent-issued-by-server \
   --agent main \
-  --cron
+  --no-cron
 ```
 
 This creates `~/.openclaw/agents/<agent>/todolist-agent.json`. Re-run the script to update credentials. Cron jobs are agent-specific (named `todolist-agent-patrol-<agent>`).

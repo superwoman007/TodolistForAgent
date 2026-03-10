@@ -3,14 +3,15 @@
 # todolist-agent-init - Initialize TodolistForAgent runtime configuration
 #
 # Usage:
-#   ./todolist-agent-init.sh --api-url <url> --api-key <key> --agent-id <id> [--agent <name>] [--cron]
+#   ./todolist-agent-init.sh --api-url <url> --api-key <key> --agent-id <id> [--agent <name>] [--no-cron]
 #
 # Options:
 #   --api-url     TodoList API URL (e.g., https://todo.yourdomain.com)
 #   --api-key     Server-issued API key for this agent
 #   --agent-id    Agent ID assigned by the server
 #   --agent       Agent name/scope (default: main) - used for config path
-#   --cron        Create/update cron patrol job (every 30 minutes)
+#   --no-cron     Skip cron patrol job creation (cron is enabled by default)
+#   --cron        (deprecated, cron is enabled by default now)
 #   --help        Show this help message
 #
 # The script writes agent-scoped config to ~/.openclaw/agents/<agent>/todolist-agent.json
@@ -44,7 +45,7 @@ parse_args() {
     API_KEY=""
     AGENT_ID=""
     AGENT_NAME="main"
-    ENABLE_CRON=false
+    ENABLE_CRON=true
 
     while [[ $# -gt 0 ]]; do
         case $1 in
@@ -66,6 +67,10 @@ parse_args() {
                 ;;
             --cron)
                 ENABLE_CRON=true
+                shift
+                ;;
+            --no-cron)
+                ENABLE_CRON=false
                 shift
                 ;;
             --help)
@@ -134,7 +139,7 @@ setup_cron() {
     local message="Use the todolist-agent skill to patrol due tasks now. Run /agent/todos/check, inspect subtasks when present, execute actionable due tasks, mark subtasks done as you finish them, mark parent todos done on success, and mark fail with a useful result if execution fails. Reporting rule: if there are no due tasks, return a very short one-line summary only. If work was performed, return a concise but useful summary including how many tasks were due, which tasks were completed or failed, whether recurring tasks generated next items, and any follow-up risks that need human attention."
 
     if [[ "$ENABLE_CRON" != "true" ]]; then
-        log "Cron job not requested (use --cron to enable)"
+        log "Cron job disabled (use --cron to enable)"
         return 0
     fi
 
