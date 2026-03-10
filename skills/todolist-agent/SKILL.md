@@ -316,13 +316,25 @@ When this skill is available in an agent that runs on a timer / cron / heartbeat
 
 Use concise reporting by default.
 
-- **If no due tasks exist**: prefer no user-facing interruption; if the host requires a response, return only a very short summary such as `No due tasks.`
+- **If no due tasks exist**: prefer no user-facing interruption; do not proactively send a message just to say nothing happened unless the host environment strictly requires a response
 - **If work was performed**: return a concise but useful summary including:
   - how many tasks were due
   - which tasks were completed or failed
   - whether recurring tasks generated next items
   - any follow-up risk or human attention needed
 - **If an execution failure happens**: clearly surface the failure reason in both the task `result` and the patrol summary
+
+### Quiet-by-default rule
+
+Do not create extra noise.
+
+- If there is no new task activity, no completed work, no failure, and no human decision needed, stay silent
+- Only interrupt the user when there is meaningful value:
+  - a task was actually processed
+  - a patrol failed or found a problem
+  - human input or approval is needed
+  - an important follow-up result should be surfaced
+- Avoid sending heartbeat-style "nothing happened" messages in normal operation
 
 ### Patrol failure handling
 
