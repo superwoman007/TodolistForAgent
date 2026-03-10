@@ -108,6 +108,14 @@ Todos / Subtasks / Recurring Rules / Results
 
 ## Quick Start
 
+### Command Shortcuts
+
+```bash
+make install   # Install dependencies
+make run       # Start the API server
+make test      # Run test suite
+```
+
 ### 1. Install dependencies
 
 ```bash
@@ -254,6 +262,23 @@ GET /agent/todos/check
 ### Agent credentials
 
 - `POST /agent/credentials`
+
+### Admin Protection
+
+Credential management endpoints (`GET /agent/credentials`, `DELETE /agent/credentials/{agent_id}`) require an admin token. Set the `ADMIN_TOKEN` environment variable to protect these admin-style operations:
+
+```bash
+export ADMIN_TOKEN=your_secret_token
+```
+
+Requests to protected endpoints must include the token in the Authorization header:
+
+```bash
+curl -X GET http://localhost:8000/agent/credentials \
+  -H "Authorization: Bearer your_secret_token"
+```
+
+Credential creation (`POST /agent/credentials`) remains open for bootstrap purposes.
 
 ### Todos
 

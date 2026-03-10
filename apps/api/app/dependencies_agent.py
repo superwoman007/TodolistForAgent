@@ -1,11 +1,51 @@
 # 功能描述：Agent 认证依赖注入
 # 参数说明：从 Authorization header 提取 API Key
 # 返回值：认证后的 agent_id
+import os
 from fastapi import Depends, HTTPException, status, Header
 from sqlalchemy.orm import Session
 from datetime import datetime, timezone
 from .db.session import get_session
 from .models.agent_credential import AgentCredential
+
+
+def get_admin_token() -> str:
+    """获取配置的管理员令牌"""
+    return os.environ.get("ADMIN_TOKEN", "")
+
+
+def require_admin(authorization: str | None = Header(None)) -> bool:
+    """验证管理员令牌"""
+    admin_token = get_admin_token()
+    if not admin_token:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Admin token not configured on server",
+        )
+    
+    if not authorization:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Missing Authorization header for admin operation",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    
+    parts = authorization.split()
+    if len(parts) != 2 or parts[0].lower() != "bearer":
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid Authorization format for admin",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    
+    token = parts[1]
+    if token != admin_token:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Invalid admin token",
+        )
+    
+    return True
 
 
 def get_agent_id(

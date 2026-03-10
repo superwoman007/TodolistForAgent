@@ -5,6 +5,8 @@ import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
+os.environ["ADMIN_TOKEN"] = "test_admin_secret"
+
 from app.main import app
 from app.db.session import Base, engine, SessionLocal
 from app.models.agent_credential import AgentCredential
@@ -512,3 +514,197 @@ def test_monthly_recurring_non_end_of_month(client, db):
     assert next_due.year == 2024
     assert next_due.month == 2
     assert next_due.day == 15
+
+
+def test_list_credentials_requires_admin(client, db):
+    response = client.get("/agent/credentials")
+    assert response.status_code == 401
+
+
+def test_list_credentials_valid_admin(client, db):
+    response = client.get(
+        "/agent/credentials",
+        headers={"Authorization": "Bearer test_admin_secret"}
+    )
+    assert response.status_code == 200
+    assert response.json() == []
+
+
+def test_list_credentials_invalid_admin(client, db):
+    response = client.get(
+        "/agent/credentials",
+        headers={"Authorization": "Bearer wrong_token"}
+    )
+    assert response.status_code == 403
+
+
+def test_list_credentials_no_header(client, db):
+    response = client.get("/agent/credentials")
+    assert response.status_code == 401
+
+
+def test_delete_credential_requires_admin(client, db):
+    cred = AgentCredential(agent_id="test-agent", api_key="ak_testkey123")
+    db.add(cred)
+    db.commit()
+    
+    response = client.delete("/agent/credentials/test-agent")
+    assert response.status_code == 401
+
+
+def test_delete_credential_valid_admin(client, db):
+    cred = AgentCredential(agent_id="test-agent", api_key="ak_testkey123")
+    db.add(cred)
+    db.commit()
+    
+    response = client.delete(
+        "/agent/credentials/test-agent",
+        headers={"Authorization": "Bearer test_admin_secret"}
+    )
+    assert response.status_code == 204
+
+
+def test_delete_credential_invalid_admin(client, db):
+    cred = AgentCredential(agent_id="test-agent", api_key="ak_testkey123")
+    db.add(cred)
+    db.commit()
+    
+    response = client.delete(
+        "/agent/credentials/test-agent",
+        headers={"Authorization": "Bearer wrong_token"}
+    )
+    assert response.status_code == 403
+
+
+def test_delete_credential_not_found_admin(client):
+    response = client.delete(
+        "/agent/credentials/nonexistent",
+        headers={"Authorization": "Bearer test_admin_secret"}
+    )
+    assert response.status_code == 404
+
+
+def test_subtask_not_found(client, db):
+    cred = AgentCredential(agent_id="test-agent", api_key="ak_testkey123")
+    db.add(cred)
+    db.commit()
+    
+    create_resp = client.post(
+        "/agent/todos",
+        headers={"Authorization": "Bearer ak_testkey123"},
+        json={"title": "Complex task"}
+    )
+    todo_id = create_resp.json()["id"]
+    
+    response = client.put(
+        f"/agent/todos/{todo_id}/subtasks/99999",
+        headers={"Authorization": "Bearer ak_testkey123"},
+        json={"title": "Does not exist"}
+    )
+    assert response.status_code == 404
+
+
+def test_subtask_update_wrong_todo(client, db):
+    cred1 = AgentCredential(agent_id="agent-1", api_key="ak_key1")
+    cred2 = AgentCredential(agent_id="agent-2", api_key="ak_key2")
+    db.add(cred1)
+    db.add(cred2)
+    db.commit()
+    
+    todo1_resp = client.post(
+        "/agent/todos",
+        headers={"Authorization": "Bearer ak_key1"},
+        json={"title": "Agent 1 task"}
+    )
+    todo1_id = todo1_resp.json()["id"]
+    
+    subtask_resp = client.post(
+        f"/agent/todos/{todo1_id}/subtasks",
+        headers={"Authorization": "Bearer ak_key1"},
+        json={"title": "Subtask", "order": 1}
+    )
+    subtask_id = subtask_resp.json()["id"]
+    
+    todo2_resp = client.post(
+        "/agent/todos",
+        headers={"Authorization": "Bearer ak_key2"},
+        json={"title": "Agent 2 task"}
+    )
+    todo2_id = todo2_resp.json()["id"]
+    
+    response = client.put(
+        f"/agent/todos/{todo2_id}/subtasks/{subtask_id}",
+        headers={"Authorization": "Bearer ak_key2"},
+        json={"title": "Hacked subtask"}
+    )
+    assert response.status_code == 404
+
+
+def test_subtask_delete_wrong_todo(client, db):
+    cred1 = AgentCredential(agent_id="agent-1", api_key="ak_key1")
+    cred2 = AgentCredential(agent_id="agent-2", api_key="ak_key2")
+    db.add(cred1)
+    db.add(cred2)
+    db.commit()
+    
+    todo1_resp = client.post(
+        "/agent/todos",
+        headers={"Authorization": "Bearer ak_key1"},
+        json={"title": "Agent 1 task"}
+    )
+    todo1_id = todo1_resp.json()["id"]
+    
+    subtask_resp = client.post(
+        f"/agent/todos/{todo1_id}/subtasks",
+        headers={"Authorization": "Bearer ak_key1"},
+        json={"title": "Subtask", "order": 1}
+    )
+    subtask_id = subtask_resp.json()["id"]
+    
+    todo2_resp = client.post(
+        "/agent/todos",
+        headers={"Authorization": "Bearer ak_key2"},
+        json={"title": "Agent 2 task"}
+    )
+    todo2_id = todo2_resp.json()["id"]
+    
+    response = client.delete(
+        f"/agent/todos/{todo2_id}/subtasks/{subtask_id}",
+        headers={"Authorization": "Bearer ak_key2"}
+    )
+    assert response.status_code == 404
+
+
+def test_subtask_mark_done_wrong_todo(client, db):
+    cred1 = AgentCredential(agent_id="agent-1", api_key="ak_key1")
+    cred2 = AgentCredential(agent_id="agent-2", api_key="ak_key2")
+    db.add(cred1)
+    db.add(cred2)
+    db.commit()
+    
+    todo1_resp = client.post(
+        "/agent/todos",
+        headers={"Authorization": "Bearer ak_key1"},
+        json={"title": "Agent 1 task"}
+    )
+    todo1_id = todo1_resp.json()["id"]
+    
+    subtask_resp = client.post(
+        f"/agent/todos/{todo1_id}/subtasks",
+        headers={"Authorization": "Bearer ak_key1"},
+        json={"title": "Subtask", "order": 1}
+    )
+    subtask_id = subtask_resp.json()["id"]
+    
+    todo2_resp = client.post(
+        "/agent/todos",
+        headers={"Authorization": "Bearer ak_key2"},
+        json={"title": "Agent 2 task"}
+    )
+    todo2_id = todo2_resp.json()["id"]
+    
+    response = client.post(
+        f"/agent/todos/{todo2_id}/subtasks/{subtask_id}/done",
+        headers={"Authorization": "Bearer ak_key2"}
+    )
+    assert response.status_code == 404

@@ -8,6 +8,7 @@ import secrets
 from ..db.session import get_session
 from ..models.agent_credential import AgentCredential
 from ..schemas.agent_credential import AgentCredentialCreate, AgentCredentialOut
+from ..dependencies_agent import require_admin
 
 router = APIRouter(prefix="/agent/credentials", tags=["agent-credentials"])
 
@@ -43,14 +44,14 @@ def create_credential(req: AgentCredentialCreate, db: Session = Depends(get_sess
 
 
 @router.get("", response_model=list[AgentCredentialOut])
-def list_credentials(db: Session = Depends(get_session)):
-    """列出所有 Agent 凭证（管理接口）"""
+def list_credentials(db: Session = Depends(get_session), _: bool = Depends(require_admin)):
+    """列出所有 Agent 凭证（管理接口，需 ADMIN_TOKEN）"""
     return db.execute(select(AgentCredential)).scalars().all()
 
 
 @router.delete("/{agent_id}", status_code=204)
-def delete_credential(agent_id: str, db: Session = Depends(get_session)):
-    """删除 Agent 凭证"""
+def delete_credential(agent_id: str, db: Session = Depends(get_session), _: bool = Depends(require_admin)):
+    """删除 Agent 凭证（管理接口，需 ADMIN_TOKEN）"""
     credential = db.execute(
         select(AgentCredential).where(AgentCredential.agent_id == agent_id)
     ).scalar_one_or_none()
