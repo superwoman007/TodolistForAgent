@@ -3,22 +3,30 @@
 # todolist-agent-init - Initialize TodolistForAgent runtime configuration
 #
 # Usage:
-#   ./todolist-agent-init.sh --api-url <url> --api-key <key> --agent-id <id> [--cron]
+#   ./todolist-agent-init.sh --api-url <url> --api-key <key> --agent-id <id> [--agent <name>] [--cron]
 #
 # Options:
 #   --api-url     TodoList API URL (e.g., https://todo.yourdomain.com)
 #   --api-key     Server-issued API key for this agent
 #   --agent-id    Agent ID assigned by the server
+#   --agent       Agent name/scope (default: main) - used for config path
 #   --cron        Create/update cron patrol job (every 30 minutes)
 #   --help        Show this help message
 #
-# The script writes ~/.openclaw/todolist-agent.json and optionally sets up
-# an OpenClaw cron job for periodic patrol checks. Safe to run multiple times.
+# The script writes agent-scoped config to ~/.openclaw/agents/<agent>/todolist-agent.json
+# and optionally sets up an OpenClaw cron job for periodic patrol checks. Safe to run multiple times.
+#
+# Why agent-scoped config?
+#   In multi-agent setups, each agent needs its own isolated config (different API keys,
+#   different agent IDs). Using a global ~/.openclaw/todolist-agent.json would cause
+#   conflicts when multiple agents are running on the same host. Agent-scoped config
+#   ensures each agent's runtime settings are isolated and do not interfere with each other.
 #
 
 set -e
 
-CONFIG_DIR="$HOME/.openclaw"
+AGENT_NAME="main"
+CONFIG_DIR="$HOME/.openclaw/agents/$AGENT_NAME"
 CONFIG_FILE="$CONFIG_DIR/todolist-agent.json"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
@@ -35,6 +43,7 @@ parse_args() {
     API_URL=""
     API_KEY=""
     AGENT_ID=""
+    AGENT_NAME="main"
     ENABLE_CRON=false
 
     while [[ $# -gt 0 ]]; do
@@ -49,6 +58,10 @@ parse_args() {
                 ;;
             --agent-id)
                 AGENT_ID="$2"
+                shift 2
+                ;;
+            --agent)
+                AGENT_NAME="$2"
                 shift 2
                 ;;
             --cron)
@@ -82,6 +95,9 @@ validate_args() {
 }
 
 create_config_dir() {
+    CONFIG_DIR="$HOME/.openclaw/agents/$AGENT_NAME"
+    CONFIG_FILE="$CONFIG_DIR/todolist-agent.json"
+    
     if [[ ! -d "$CONFIG_DIR" ]]; then
         mkdir -p "$CONFIG_DIR"
         log "Created config directory: $CONFIG_DIR"
@@ -114,7 +130,7 @@ EOF
 }
 
 setup_cron() {
-    local job_name="todolist-agent-patrol"
+    local job_name="todolist-agent-patrol-${AGENT_NAME}"
     local message="Use the todolist-agent skill to patrol due tasks now. Run /agent/todos/check, inspect subtasks when present, execute actionable due tasks, mark subtasks done as you finish them, mark parent todos done on success, and mark fail with a useful result if execution fails. Reporting rule: if there are no due tasks, return a very short one-line summary only. If work was performed, return a concise but useful summary including how many tasks were due, which tasks were completed or failed, whether recurring tasks generated next items, and any follow-up risks that need human attention."
 
     if [[ "$ENABLE_CRON" != "true" ]]; then
@@ -123,12 +139,12 @@ setup_cron() {
     fi
 
     local existing_id
-    existing_id=$(openclaw cron list --json 2>/dev/null | python3 - <<'PY'
+    existing_id=$(openclaw cron list --json 2>/dev/null | python3 - <<PY
 import json,sys
 try:
     data=json.load(sys.stdin)
     for job in data.get('jobs', []):
-        if job.get('name') == 'todolist-agent-patrol':
+        if job.get('name') == 'todolist-agent-patrol-${AGENT_NAME}':
             print(job.get('id',''))
             break
 except Exception:

@@ -195,9 +195,15 @@ cp -r skills/todolist-agent ~/.openclaw/skills/
 
 Do **not** rely on editing `~/.openclaw/openclaw.json` for per-agent TodoList connection settings, because that may require restarting OpenClaw.
 
-Instead, provide a separate runtime config file:
+Instead, provide a separate agent-scoped runtime config file:
 
-`~/.openclaw/todolist-agent.json`
+`~/.openclaw/agents/<agent>/todolist-agent.json`
+
+Where `<agent>` is the agent name (default: `main`). For example:
+
+- `~/.openclaw/agents/main/todolist-agent.json` - default agent
+- `~/.openclaw/agents/assistant/todolist-agent.json` - assistant agent
+- `~/.openclaw/agents/worker1/todolist-agent.json` - worker1 agent
 
 Example:
 
@@ -209,9 +215,14 @@ Example:
 }
 ```
 
+**Why agent-scoped config?**
+
+In multi-agent setups, each agent needs its own isolated configuration with different API keys and agent IDs. Using a global `~/.openclaw/todolist-agent.json` would cause conflicts when multiple agents run on the same host. Agent-scoped config ensures each agent's runtime settings are isolated and do not interfere with each other.
+
 Recommended behavior for host agents using this skill:
 - install the skill once
-- update `~/.openclaw/todolist-agent.json` when connection info changes
+- for each agent, create `~/.openclaw/agents/<agent>/todolist-agent.json` with that agent's credentials
+- update the agent-specific config when connection info changes
 - avoid using `~/.openclaw/openclaw.json` for these per-agent runtime values
 
 ### Backward-compatible env mode
@@ -245,23 +256,34 @@ cd TodoList
 cp -r skills/todolist-agent ~/.openclaw/skills/
 
 # Initialize runtime config (required for skill to work)
+# Use --agent to specify agent name (default: main)
 ./scripts/todolist-agent-init.sh \
   --api-url https://todo.yourdomain.com \
   --api-key ak_server_issued_for_this_agent \
-  --agent-id agent-issued-by-server
+  --agent-id agent-issued-by-server \
+  --agent main
+
+# For a different agent:
+./scripts/todolist-agent-init.sh \
+  --api-url https://todo.yourdomain.com \
+  --api-key ak_another_agent_key \
+  --agent-id another-agent-id \
+  --agent assistant
 
 # Optional: also set up cron patrol (every 30 minutes)
 ./scripts/todolist-agent-init.sh \
   --api-url https://todo.yourdomain.com \
   --api-key ak_server_issued_for_this_agent \
   --agent-id agent-issued-by-server \
+  --agent main \
   --cron
 ```
 
 The init script:
-- Creates/updates `~/.openclaw/todolist-agent.json` with your credentials
+- Creates/updates `~/.openclaw/agents/<agent>/todolist-agent.json` with your credentials
 - Is idempotent (safe to re-run; only updates if values change)
 - With `--cron`, creates or updates an **OpenClaw cron job** that patrols every 30 minutes
+- Cron jobs are agent-specific (named `todolist-agent-patrol-<agent>`)
 
 To reconfigure later, simply run the script again with new values.
 
