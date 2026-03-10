@@ -256,7 +256,7 @@ cd TodoList
 cp -r skills/todolist-agent ~/.openclaw/skills/
 
 # Initialize runtime config (required for skill to work)
-# Use --agent to specify agent name (default: main)
+# Cron patrol is created by default
 ./scripts/todolist-agent-init.sh \
   --api-url https://todo.yourdomain.com \
   --api-key ak_server_issued_for_this_agent \
@@ -270,19 +270,20 @@ cp -r skills/todolist-agent ~/.openclaw/skills/
   --agent-id another-agent-id \
   --agent assistant
 
-# Optional: also set up cron patrol (every 30 minutes)
+# Skip cron creation only when you explicitly do not want patrols
 ./scripts/todolist-agent-init.sh \
   --api-url https://todo.yourdomain.com \
   --api-key ak_server_issued_for_this_agent \
   --agent-id agent-issued-by-server \
   --agent main \
-  --cron
+  --no-cron
 ```
 
 The init script:
 - Creates/updates `~/.openclaw/agents/<agent>/todolist-agent.json` with your credentials
 - Is idempotent (safe to re-run; only updates if values change)
-- With `--cron`, creates or updates an **OpenClaw cron job** that patrols every 30 minutes
+- **Creates or updates an OpenClaw cron patrol job by default**
+- Use `--no-cron` only when you explicitly do not want scheduled patrols
 - Cron jobs are agent-specific (named `todolist-agent-patrol-<agent>`)
 
 To reconfigure later, simply run the script again with new values.
