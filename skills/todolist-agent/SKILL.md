@@ -250,6 +250,35 @@ You:
 3. **Use subtasks**: Break complex tasks into smaller subtasks
 4. **Set priorities**: Execute high priority tasks first
 5. **Handle failures**: Mark as failed with error message, don't skip silently
+6. **Persist actionable plans**: If you create a plan for yourself and it is not something you will finish immediately in the current turn, write it into TodoList instead of leaving it only in the conversation
+
+## Plan Persistence Rule
+
+When you, the agent, generate your own plan, decide whether it is only short-lived reasoning or whether it should become tracked work.
+
+**Do NOT create a todo for:**
+- fleeting internal reasoning
+- steps you will finish immediately in the current turn
+- scratch sequencing that has no future follow-up value
+
+**Create a todo automatically when any of these are true:**
+- the work cannot be completed in the current turn
+- the work depends on a future time or deadline
+- you need to follow up later
+- the work should survive session restarts
+- the plan contains multiple execution steps worth tracking
+
+**Use subtasks for multi-step plans.**
+
+Examples:
+- If you think: "Later I should rerun the deployment check and report back" → create a todo
+- If you think: "This task has 3 follow-up actions" → create one parent todo and add subtasks
+- If you think: "First I'll read the file, then reply" and you will do it right now → do not create a todo
+
+Default behavior:
+- Prefer storing durable action items rather than leaving them only in chat text
+- If a plan becomes a todo, write the execution intent into `description`
+- If the plan is complex, create the parent todo first, then create subtasks
 
 ---
 
