@@ -229,6 +229,19 @@ You:
    - If error: POST /agent/todos/{id}/fail
 ```
 
+### Scheduled patrol behavior
+
+When this skill is available in an agent that runs on a timer / cron / heartbeat:
+
+1. Periodically call `GET /agent/todos/check`
+2. If no due tasks exist, return a short "nothing due" result and stop
+3. If due tasks exist, process them in returned order
+4. For tasks with subtasks, fetch subtasks first and complete actionable unfinished subtasks before finishing the parent task
+5. Mark successful work with `POST /done` and include a useful `result`
+6. Mark failures with `POST /fail` and include the error/result summary
+
+Default recommendation: run this patrol every 30 minutes unless the host agent has a stricter schedule requirement.
+
 ### User asks "what are your todos":
 
 ```
