@@ -708,3 +708,128 @@ def test_subtask_mark_done_wrong_todo(client, db):
         headers={"Authorization": "Bearer ak_key2"}
     )
     assert response.status_code == 404
+
+
+def test_create_todo_with_timezone_offset(client, db):
+    from datetime import datetime, timezone, timedelta
+    cred = AgentCredential(agent_id="test-agent", api_key="ak_testkey123")
+    db.add(cred)
+    db.commit()
+    
+    utc_time = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+    due_in_plus8 = utc_time.astimezone(timezone(timedelta(hours=8)))
+    expected_utc = utc_time
+    due_str = due_in_plus8.isoformat()
+    
+    response = client.post(
+        "/agent/todos",
+        headers={"Authorization": "Bearer ak_testkey123"},
+        json={
+            "title": "Timezone test",
+            "due_at": due_str
+        }
+    )
+    assert response.status_code == 201
+    data = response.json()
+    assert data["due_at"] is not None
+    
+    due_returned = datetime.fromisoformat(data["due_at"].replace("Z", "+00:00"))
+    assert due_returned.tzinfo is not None
+    assert due_returned == expected_utc
+
+
+def test_check_due_todos_with_timezone_returns_overdue(client, db):
+    from datetime import datetime, timezone, timedelta
+    cred = AgentCredential(agent_id="test-agent", api_key="ak_testkey123")
+    db.add(cred)
+    db.commit()
+    
+    past_utc = datetime.now(timezone.utc) - timedelta(hours=1)
+    past_with_offset = past_utc - timedelta(hours=8)
+    
+    client.post(
+        "/agent/todos",
+        headers={"Authorization": "Bearer ak_testkey123"},
+        json={
+            "title": "Overdue task with +08:00",
+            "due_at": past_with_offset.isoformat()
+        }
+    )
+    
+    response = client.get(
+        "/agent/todos/check",
+        headers={"Authorization": "Bearer ak_testkey123"}
+    )
+    assert response.status_code == 200
+    todos = response.json()
+    assert len(todos) == 1
+    assert todos[0]["title"] == "Overdue task with +08:00"
+
+
+def test_update_todo_with_timezone_offset(client, db):
+    from datetime import datetime, timezone, timedelta
+    cred = AgentCredential(agent_id="test-agent", api_key="ak_testkey123")
+    db.add(cred)
+    db.commit()
+    
+    create_resp = client.post(
+        "/agent/todos",
+        headers={"Authorization": "Bearer ak_testkey123"},
+        json={"title": "Original"}
+    )
+    todo_id = create_resp.json()["id"]
+    
+    base_time = datetime.now(timezone.utc).replace(hour=5, minute=0, second=0, microsecond=0)
+    new_due_plus8 = base_time.astimezone(timezone(timedelta(hours=8)))
+    expected_utc = base_time
+    
+    response = client.put(
+        f"/agent/todos/{todo_id}",
+        headers={"Authorization": "Bearer ak_testkey123"},
+        json={"due_at": new_due_plus8.isoformat()}
+    )
+    assert response.status_code == 200
+    data = response.json()
+    
+    due_returned = datetime.fromisoformat(data["due_at"].replace("Z", "+00:00"))
+    assert due_returned.tzinfo is not None
+    assert due_returned == expected_utc
+
+
+def test_recurring_with_timezone_preserves_utc(client, db):
+    from datetime import datetime, timezone, timedelta
+    cred = AgentCredential(agent_id="test-agent", api_key="ak_testkey123")
+    db.add(cred)
+    db.commit()
+    
+    due_utc = datetime.now(timezone.utc) + timedelta(hours=1)
+    due_with_offset = due_utc - timedelta(hours=8)
+    
+    create_resp = client.post(
+        "/agent/todos",
+        headers={"Authorization": "Bearer ak_testkey123"},
+        json={
+            "title": "Daily task",
+            "repeat_rule": "daily",
+            "due_at": due_with_offset.isoformat()
+        }
+    )
+    todo_id = create_resp.json()["id"]
+    
+    done_resp = client.post(
+        f"/agent/todos/{todo_id}/done",
+        headers={"Authorization": "Bearer ak_testkey123"},
+        json={}
+    )
+    assert done_resp.status_code == 200
+    
+    todos_resp = client.get(
+        "/agent/todos?status=all",
+        headers={"Authorization": "Bearer ak_testkey123"}
+    )
+    todos = todos_resp.json()
+    assert len(todos) == 2
+    
+    pending = next(t for t in todos if t["status"] == "pending")
+    pending_due = datetime.fromisoformat(pending["due_at"].replace("Z", "+00:00"))
+    assert pending_due.tzinfo is not None

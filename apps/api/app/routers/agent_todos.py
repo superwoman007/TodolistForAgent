@@ -34,24 +34,36 @@ def _add_months(dt: datetime, months: int) -> datetime:
     If the resulting month has fewer days than the original day,
     the day is clamped to the last day of the month.
     """
-    year = dt.year + (dt.month - 1 + months) // 12
-    month = (dt.month - 1 + months) % 12 + 1
+    tz = dt.tzinfo
+    dt_naive = dt.replace(tzinfo=None)
+    year = dt_naive.year + (dt_naive.month - 1 + months) // 12
+    month = (dt_naive.month - 1 + months) % 12 + 1
     
     max_day = calendar.monthrange(year, month)[1]
-    day = min(dt.day, max_day)
+    day = min(dt_naive.day, max_day)
     
-    return dt.replace(year=year, month=month, day=day)
+    result = dt_naive.replace(year=year, month=month, day=day)
+    if tz is not None:
+        result = result.replace(tzinfo=tz)
+    return result
 
 
 def _next_due(current_due: datetime, rule: str) -> datetime | None:
     """根据重复规则计算下一次执行时间"""
+    if current_due is None:
+        return None
+    tz = current_due.tzinfo
     if rule == "daily":
-        return current_due + timedelta(days=1)
+        new_due = current_due + timedelta(days=1)
     elif rule == "weekly":
-        return current_due + timedelta(weeks=1)
+        new_due = current_due + timedelta(weeks=1)
     elif rule == "monthly":
-        return _add_months(current_due, 1)
-    return None
+        new_due = _add_months(current_due, 1)
+    else:
+        return None
+    if tz is not None:
+        new_due = new_due.replace(tzinfo=tz)
+    return new_due
 
 
 # ── 查询待办列表 ──────────────────────────────────────────
