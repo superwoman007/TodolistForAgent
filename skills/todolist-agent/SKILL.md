@@ -22,6 +22,16 @@ Content-Type: application/json
 
 `${TODOLIST_API_URL}` (default: http://localhost:8000)
 
+## Identity and provisioning note
+
+This skill assumes the host agent has already been provisioned with a valid connection to a TodoList backend.
+
+In a centralized server setup:
+- the backend URL and API key are supplied by the server/operator
+- different agents should use different API keys
+- current versions use a simple identity model: if an agent loses its local binding/config and is provisioned again, it is treated as a **new agent** and gets a **new task space**
+- recovery of the previous space after local identity loss is **not supported yet**
+
 ---
 
 ## Todo APIs

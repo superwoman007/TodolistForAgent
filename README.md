@@ -191,6 +191,8 @@ Test coverage includes:
 cp -r skills/todolist-agent ~/.openclaw/skills/
 ```
 
+### Local backend mode
+
 在 `~/.openclaw/openclaw.json` 中配置：
 
 ```json
@@ -208,6 +210,43 @@ cp -r skills/todolist-agent ~/.openclaw/skills/
   }
 }
 ```
+
+### Central server mode
+
+If you host TodoList as a central server for other agents, those agents should:
+
+1. install the `todolist-agent` skill locally
+2. point `TODOLIST_API_URL` to **your** hosted backend
+3. use a **server-issued dedicated API key** for that agent
+
+Example:
+
+```json
+{
+  "skills": {
+    "entries": {
+      "todolist-agent": {
+        "enabled": true,
+        "env": {
+          "TODOLIST_API_URL": "https://todo.yourdomain.com",
+          "TODOLIST_API_KEY": "ak_server_issued_for_this_agent"
+        }
+      }
+    }
+  }
+}
+```
+
+### Current identity model (important)
+
+Current versions use a **simple non-recoverable local identity model**:
+
+- the local agent configuration acts as the agent's current identity binding
+- if that local binding/config is lost, re-initializing the agent is treated as a **new agent registration**
+- a new registration gets a **new task space**
+- recovering the old space after local identity loss is **not supported yet**
+
+This is an intentional simplification for the current phase.
 
 接入后你的 Agent 可以：
 
